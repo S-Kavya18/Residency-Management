@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sand: #f8f4ee;
+  --teal: #0f766e;
+  --slate: #0f172a;
+  --sun: #fbbf24;
+}
+
+body {
+  margin: 0;
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
+  background-color: var(--sand);
+  color: var(--slate);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.font-display {
+  font-family: 'Playfair Display', 'Times New Roman', serif;
+}
+
+.landing-bg {
+  background-image: radial-gradient(circle at top, rgba(251, 191, 36, 0.2), transparent 45%),
+    radial-gradient(circle at 10% 40%, rgba(15, 118, 110, 0.16), transparent 50%),
+    linear-gradient(135deg, #f8f4ee 0%, #eef6f6 60%, #fffaf3 100%);
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes floatSlow {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.fade-up {
+  animation: fadeUp 0.8s ease both;
+}
+
+.float-slow {
+  animation: floatSlow 6s ease-in-out infinite;
+}
+
+.stagger > * {
+  animation: fadeUp 0.8s ease both;
+}
+
+.hero-banner {
+  min-height: 70vh;
+  background-image: url('https://haspcms-chroma-hospitality.s3.ap-southeast-1.amazonaws.com/01K7R4S2R42B7GDNC86SWB1PMM.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+.stagger > *:nth-child(2) {
+  animation-delay: 120ms;
+}
+
+.stagger > *:nth-child(3) {
+  animation-delay: 240ms;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
