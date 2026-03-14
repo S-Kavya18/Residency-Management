@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
+import { validateRegister } from '../utils/validationSchemas';
 
 const Register = () => {
   const [formData, setFormData] = useState({
@@ -14,29 +15,31 @@ const Register = () => {
     role: 'resident'
   });
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState({});
   const { register } = useAuth();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (formData.password !== formData.confirmPassword) {
-      toast.error('Passwords do not match');
-      return;
-    }
-
-    if (formData.password.length < 6) {
-      toast.error('Password must be at least 6 characters');
+    const { errors: validationErrors, value } = validateRegister(formData);
+    if (Object.keys(validationErrors).length) {
+      setErrors(validationErrors);
+      toast.error('Please fix the highlighted fields');
       return;
     }
 
     setLoading(true);
 
-    const { confirmPassword, ...registerData } = formData;
+    const { confirmPassword, ...registerData } = value;
     const result = await register(registerData);
 
     if (result.success) {
@@ -63,31 +66,33 @@ const Register = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Full Name
+              Full Name <span className="text-red-600" aria-hidden="true">*</span>
             </label>
             <input
               type="text"
               name="name"
               value={formData.name}
               onChange={handleChange}
-              required
+              aria-invalid={Boolean(errors.name)}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-600 focus:border-transparent"
               placeholder="Enter your full name"
             />
+            {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Email
+              Email <span className="text-red-600" aria-hidden="true">*</span>
             </label>
             <input
               type="email"
               name="email"
               value={formData.email}
               onChange={handleChange}
-              required
+              aria-invalid={Boolean(errors.email)}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-600 focus:border-transparent"
               placeholder="Enter your email"
             />
+            {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -98,9 +103,11 @@ const Register = () => {
               name="phone"
               value={formData.phone}
               onChange={handleChange}
+              aria-invalid={Boolean(errors.phone)}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-600 focus:border-transparent"
               placeholder="Enter your phone number"
             />
+            {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -111,37 +118,41 @@ const Register = () => {
               value={formData.address}
               onChange={handleChange}
               rows="2"
+              aria-invalid={Boolean(errors.address)}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-600 focus:border-transparent"
               placeholder="Enter your address"
             />
+            {errors.address && <p className="mt-1 text-sm text-red-600">{errors.address}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Password
+              Password <span className="text-red-600" aria-hidden="true">*</span>
             </label>
             <input
               type="password"
               name="password"
               value={formData.password}
               onChange={handleChange}
-              required
+              aria-invalid={Boolean(errors.password)}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-600 focus:border-transparent"
               placeholder="Enter your password"
             />
+            {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
-              Confirm Password
+              Confirm Password <span className="text-red-600" aria-hidden="true">*</span>
             </label>
             <input
               type="password"
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
-              required
+              aria-invalid={Boolean(errors.confirmPassword)}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-teal-600 focus:border-transparent"
               placeholder="Confirm your password"
             />
+            {errors.confirmPassword && <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>}
           </div>
           <button
             type="submit"

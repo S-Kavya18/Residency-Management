@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { validateFoodFeedback } from '../../utils/validationSchemas';
 
 const FoodServices = () => {
   const [menu, setMenu] = useState({});
   const [subscription, setSubscription] = useState(null);
   const [feedback, setFeedback] = useState({ rating: 5, comment: '' });
   const [loading, setLoading] = useState(false);
+  const [feedbackErrors, setFeedbackErrors] = useState({});
 
   useEffect(() => {
     fetchMenu();
@@ -69,11 +71,20 @@ const FoodServices = () => {
 
   const handleFeedbackSubmit = async (e) => {
     e.preventDefault();
+    const { errors: validationErrors, value } = validateFoodFeedback(feedback);
+
+    if (Object.keys(validationErrors).length) {
+      setFeedbackErrors(validationErrors);
+      toast.error('Please fix the feedback fields');
+      return;
+    }
+
     setLoading(true);
     try {
-      await api.post('/food/feedback', feedback);
+      await api.post('/food/feedback', value);
       toast.success('Feedback submitted successfully!');
       setFeedback({ rating: 5, comment: '' });
+      setFeedbackErrors({});
       fetchSubscription();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to submit feedback');
@@ -162,23 +173,37 @@ const FoodServices = () => {
                       <label className="block text-sm font-medium text-gray-700 mb-2">Rating</label>
                       <select
                         value={feedback.rating}
-                        onChange={(e) => setFeedback({ ...feedback, rating: parseInt(e.target.value) })}
+                        onChange={(e) => {
+                          setFeedback({ ...feedback, rating: parseInt(e.target.value) });
+                          if (feedbackErrors.rating) {
+                            setFeedbackErrors((prev) => ({ ...prev, rating: undefined }));
+                          }
+                        }}
+                        aria-invalid={Boolean(feedbackErrors.rating)}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                       >
                         {[5, 4, 3, 2, 1].map(rating => (
                           <option key={rating} value={rating}>{rating} Stars</option>
                         ))}
                       </select>
+                      {feedbackErrors.rating && <p className="mt-1 text-sm text-red-600">{feedbackErrors.rating}</p>}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Comment</label>
                       <textarea
                         value={feedback.comment}
-                        onChange={(e) => setFeedback({ ...feedback, comment: e.target.value })}
+                        onChange={(e) => {
+                          setFeedback({ ...feedback, comment: e.target.value });
+                          if (feedbackErrors.comment) {
+                            setFeedbackErrors((prev) => ({ ...prev, comment: undefined }));
+                          }
+                        }}
                         rows="3"
+                        aria-invalid={Boolean(feedbackErrors.comment)}
                         className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                         placeholder="Your feedback..."
                       />
+                      {feedbackErrors.comment && <p className="mt-1 text-sm text-red-600">{feedbackErrors.comment}</p>}
                     </div>
                     <button
                       type="submit"

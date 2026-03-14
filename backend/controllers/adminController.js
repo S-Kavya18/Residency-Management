@@ -225,11 +225,6 @@ exports.checkoutRoom = async (req, res) => {
       await latestApplication.save();
     }
 
-    await Complaint.updateMany(
-      { userId: user._id, isArchived: false },
-      { $set: { isArchived: true, archivedAt: now } }
-    );
-
     await ActivityLog.create({
       userId: req.user.userId,
       action: 'checkout',

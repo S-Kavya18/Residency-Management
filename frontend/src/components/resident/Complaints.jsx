@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { validateComplaint } from '../../utils/validationSchemas';
 
 const Complaints = () => {
   const [complaints, setComplaints] = useState([]);
@@ -14,6 +15,7 @@ const Complaints = () => {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [view, setView] = useState('active');
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     fetchComplaints();
@@ -29,25 +31,34 @@ const Complaints = () => {
   };
 
   const handleChange = (e) => {
-    if (e.target.name === 'image') {
-      setFormData({ ...formData, image: e.target.files[0] });
-    } else {
-      setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, files, value } = e.target;
+    const nextValue = name === 'image' ? files[0] : value;
+    setFormData({ ...formData, [name]: nextValue });
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const { errors: validationErrors, value } = validateComplaint(formData);
+
+    if (Object.keys(validationErrors).length) {
+      setErrors(validationErrors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
+
     setLoading(true);
 
     try {
       const formDataToSend = new FormData();
-      formDataToSend.append('category', formData.category);
-      formDataToSend.append('title', formData.title);
-      formDataToSend.append('description', formData.description);
-      formDataToSend.append('priority', formData.priority);
-      if (formData.image) {
-        formDataToSend.append('image', formData.image);
+      formDataToSend.append('category', value.category);
+      formDataToSend.append('title', value.title);
+      formDataToSend.append('description', value.description);
+      formDataToSend.append('priority', value.priority);
+      if (value.image) {
+        formDataToSend.append('image', value.image);
       }
 
       await api.post('/complaints', formDataToSend, {
@@ -56,6 +67,7 @@ const Complaints = () => {
 
       toast.success('Complaint submitted successfully!');
       setFormData({ category: '', title: '', description: '', priority: 'medium', image: null });
+      setErrors({});
       setShowForm(false);
       fetchComplaints();
     } catch (error) {
@@ -104,7 +116,10 @@ const Complaints = () => {
             History
           </button>
           <button
-            onClick={() => setShowForm(!showForm)}
+            onClick={() => {
+              setShowForm(!showForm);
+              setErrors({});
+            }}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
           >
             {showForm ? 'Cancel' : 'Raise Complaint'}
@@ -122,7 +137,7 @@ const Complaints = () => {
                 name="category"
                 value={formData.category}
                 onChange={handleChange}
-                required
+                aria-invalid={Boolean(errors.category)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Select category</option>
@@ -133,6 +148,7 @@ const Complaints = () => {
                 <option value="security">Security</option>
                 <option value="other">Other</option>
               </select>
+              {errors.category && <p className="mt-1 text-sm text-red-600">{errors.category}</p>}
             </div>
 
             <div>
@@ -142,10 +158,11 @@ const Complaints = () => {
                 name="title"
                 value={formData.title}
                 onChange={handleChange}
-                required
+                aria-invalid={Boolean(errors.title)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                 placeholder="Brief description of the issue"
               />
+              {errors.title && <p className="mt-1 text-sm text-red-600">{errors.title}</p>}
             </div>
 
             <div>
@@ -154,11 +171,12 @@ const Complaints = () => {
                 name="description"
                 value={formData.description}
                 onChange={handleChange}
-                required
                 rows="4"
+                aria-invalid={Boolean(errors.description)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                 placeholder="Detailed description of the complaint"
               />
+              {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
             </div>
 
             <div>
@@ -174,6 +192,7 @@ const Complaints = () => {
                 <option value="high">High</option>
                 <option value="urgent">Urgent</option>
               </select>
+              {errors.priority && <p className="mt-1 text-sm text-red-600">{errors.priority}</p>}
             </div>
 
             <div>
@@ -185,6 +204,7 @@ const Complaints = () => {
                 accept="image/*"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               />
+              {errors.image && <p className="mt-1 text-sm text-red-600">{errors.image}</p>}
             </div>
 
             <button

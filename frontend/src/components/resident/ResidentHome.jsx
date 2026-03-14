@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { Link } from 'react-router-dom';
-import { FiHome, FiFileText, FiAlertCircle, FiCheckCircle } from 'react-icons/fi';
+import toast from 'react-hot-toast';
+import { FiHome, FiFileText, FiAlertCircle, FiCheckCircle, FiAlertTriangle } from 'react-icons/fi';
 
 const ResidentHome = () => {
   const { user, refreshUser } = useAuth();
@@ -13,6 +14,7 @@ const ResidentHome = () => {
     subscriptionStatus: false
   });
   const [loading, setLoading] = useState(true);
+  const [emergencyLoading, setEmergencyLoading] = useState(false);
 
   useEffect(() => {
     refreshUser();
@@ -68,6 +70,26 @@ const ResidentHome = () => {
       console.error('Error fetching dashboard data:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleEmergency = async () => {
+    if (emergencyLoading) return;
+
+    const defaultMessage = stats.roomStatus?.roomNumber
+      ? `Emergency assistance needed in room ${stats.roomStatus.roomNumber}`
+      : 'Emergency assistance needed';
+    const message = window.prompt('Describe the emergency (optional):', defaultMessage);
+    if (message === null) return; // user cancelled
+
+    setEmergencyLoading(true);
+    try {
+      await api.post('/complaints/emergency', { description: message });
+      toast.success('Emergency alert sent to admin and security staff');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to send emergency alert');
+    } finally {
+      setEmergencyLoading(false);
     }
   };
 
@@ -144,6 +166,14 @@ const ResidentHome = () => {
                 Apply for Room
               </Link>
             )}
+            <button
+              onClick={handleEmergency}
+              disabled={emergencyLoading}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+            >
+              <FiAlertTriangle />
+              {emergencyLoading ? 'Sending alert...' : 'Emergency Assist'}
+            </button>
             <Link
               to="/resident/complaints"
               className="block w-full text-left px-4 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { validateStaff } from '../../utils/validationSchemas';
 
 const departmentOptions = [
   { value: 'electrical', label: 'Electrical' },
@@ -23,6 +24,7 @@ const StaffManagement = () => {
     staffDepartment: 'maintenance',
     password: ''
   });
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     fetchStaff();
@@ -45,24 +47,42 @@ const StaffManagement = () => {
       staffDepartment: 'maintenance',
       password: ''
     });
+    setErrors({});
+  };
+
+  const updateField = (name, value) => {
+    setFormData((prev) => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const { errors: validationErrors, value } = validateStaff(formData, {
+      requirePassword: !editingStaff
+    });
+
+    if (Object.keys(validationErrors).length) {
+      setErrors(validationErrors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (editingStaff) {
         const payload = {
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          staffDepartment: formData.staffDepartment
+          name: value.name,
+          email: value.email,
+          phone: value.phone,
+          staffDepartment: value.staffDepartment
         };
         await api.put(`/admin/staff/${editingStaff._id}`, payload);
         toast.success('Staff updated successfully');
       } else {
-        await api.post('/admin/staff', formData);
+        await api.post('/admin/staff', value);
         toast.success('Staff created successfully');
       }
       setShowForm(false);
@@ -85,6 +105,7 @@ const StaffManagement = () => {
       staffDepartment: staff.staffDepartment || 'maintenance',
       password: ''
     });
+    setErrors({});
     setShowForm(true);
   };
 
@@ -127,35 +148,40 @@ const StaffManagement = () => {
               <input
                 type="text"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
+                onChange={(e) => updateField('name', e.target.value)}
+                aria-invalid={Boolean(errors.name)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               />
+              {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
               <input
                 type="email"
                 value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                required
+                onChange={(e) => updateField('email', e.target.value)}
+                aria-invalid={Boolean(errors.email)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               />
+              {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
               <input
                 type="text"
                 value={formData.phone}
-                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                onChange={(e) => updateField('phone', e.target.value)}
+                aria-invalid={Boolean(errors.phone)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               />
+              {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Department</label>
               <select
                 value={formData.staffDepartment}
-                onChange={(e) => setFormData({ ...formData, staffDepartment: e.target.value })}
+                onChange={(e) => updateField('staffDepartment', e.target.value)}
+                aria-invalid={Boolean(errors.staffDepartment)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               >
                 {departmentOptions.map((dept) => (
@@ -164,6 +190,7 @@ const StaffManagement = () => {
                   </option>
                 ))}
               </select>
+              {errors.staffDepartment && <p className="mt-1 text-sm text-red-600">{errors.staffDepartment}</p>}
             </div>
             {!editingStaff && (
               <div className="md:col-span-2">
@@ -171,10 +198,11 @@ const StaffManagement = () => {
                 <input
                   type="password"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  required
+                  onChange={(e) => updateField('password', e.target.value)}
+                  aria-invalid={Boolean(errors.password)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                 />
+                {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
               </div>
             )}
             <div className="md:col-span-2">

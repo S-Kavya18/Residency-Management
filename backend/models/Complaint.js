@@ -45,6 +45,10 @@ const complaintSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  isEmergency: {
+    type: Boolean,
+    default: false
+  },
   isArchived: {
     type: Boolean,
     default: false

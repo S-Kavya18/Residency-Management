@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { validateRoomApplication } from '../../utils/validationSchemas';
+import { useAuth } from '../../context/AuthContext';
 
 const RoomApplication = () => {
+  const { user } = useAuth();
   const [rooms, setRooms] = useState([]);
   const [applications, setApplications] = useState([]);
   const [formData, setFormData] = useState({
@@ -14,6 +17,7 @@ const RoomApplication = () => {
   });
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState({ roomType: '', floor: '', acType: '' });
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     fetchAvailableRooms();
@@ -45,12 +49,21 @@ const RoomApplication = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const { errors: validationErrors, value } = validateRoomApplication(formData);
+
+    if (Object.keys(validationErrors).length) {
+      setErrors(validationErrors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await api.post('/applications', formData);
+      await api.post('/applications', value);
       toast.success('Application submitted successfully!');
       setFormData({ roomId: '', preferredFloor: '', roomType: '', plannedCheckInAt: '', plannedCheckOutAt: '' });
+      setErrors({});
       fetchMyApplications();
       fetchAvailableRooms();
     } catch (error) {
@@ -64,51 +77,39 @@ const RoomApplication = () => {
     const badges = {
       pending: 'bg-yellow-100 text-yellow-800',
       approved: 'bg-green-100 text-green-800',
-      rejected: 'bg-red-100 text-red-800'
+      rejected: 'bg-red-100 text-red-800',
+      'checked out': 'bg-blue-100 text-blue-800'
     };
     return badges[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  const displayStatus = (app) => (app.actualCheckOutAt ? 'checked out' : app.status);
+
+  const formatDateTime = (value) => {
+    if (!value) return '—';
+    return new Date(value).toLocaleString();
   };
 
   return (
     <div>
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Room Application</h1>
 
-      {/* My Applications */}
-      {applications.length > 0 && (
-        <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-          <h2 className="text-xl font-semibold mb-4">My Applications</h2>
-          <div className="space-y-4">
-            {applications.map((app) => (
-              <div key={app._id} className="border border-gray-200 rounded-lg p-4">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="font-semibold">Room: {app.roomId?.roomNumber}</p>
-                    <p className="text-sm text-gray-600">Type: {app.roomType}</p>
-                    <p className="text-sm text-gray-600">Applied: {new Date(app.appliedDate).toLocaleDateString()}</p>
-                    {app.plannedCheckInAt && app.plannedCheckOutAt && (
-                      <p className="text-sm text-gray-600">
-                        Planned: {new Date(app.plannedCheckInAt).toLocaleString()} - {new Date(app.plannedCheckOutAt).toLocaleString()}
-                      </p>
-                    )}
-                    {app.actualCheckOutAt && (
-                      <p className="text-sm text-gray-600">
-                        Checked out: {new Date(app.actualCheckOutAt).toLocaleString()}
-                      </p>
-                    )}
-                    {app.earlyCheckoutReason && (
-                      <p className="text-sm text-gray-600 mt-2">Checkout reason: {app.earlyCheckoutReason}</p>
-                    )}
-                    {app.remarks && <p className="text-sm text-gray-600 mt-2">Remarks: {app.remarks}</p>}
-                  </div>
-                  <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusBadge(app.status)}`}>
-                    {app.status}
-                  </span>
-                </div>
-              </div>
-            ))}
+      {/* Current room */}
+      <div className="bg-white p-6 rounded-lg shadow-md mb-6">
+        <h2 className="text-xl font-semibold mb-4">Current Room</h2>
+        {user?.roomId ? (
+          <div className="border border-gray-200 rounded-lg p-4">
+            <p className="font-semibold">Room: {user.roomId.roomNumber || '—'}</p>
+            <p className="text-sm text-gray-600">
+              {user.roomId.roomType} · Floor {user.roomId.floor}
+            </p>
+            <p className="text-sm text-gray-600">Check-in: {formatDateTime(user.checkInAt)}</p>
+            <p className="text-sm text-gray-600">Planned checkout: {formatDateTime(applications.find((a) => !a.actualCheckOutAt)?.plannedCheckOutAt)}</p>
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-gray-600">You do not have an active room right now.</p>
+        )}
+      </div>
 
       {/* Application Form */}
       {applications.filter(app => app.status === 'pending').length === 0 && (
@@ -172,8 +173,11 @@ const RoomApplication = () => {
                     roomType: room?.roomType || '',
                     preferredFloor: room?.floor || ''
                   });
+                  if (errors.roomId) {
+                    setErrors((prev) => ({ ...prev, roomId: undefined }));
+                  }
                 }}
-                required
+                aria-invalid={Boolean(errors.roomId)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Choose a room</option>
@@ -183,6 +187,7 @@ const RoomApplication = () => {
                   </option>
                 ))}
               </select>
+              {errors.roomId && <p className="mt-1 text-sm text-red-600">{errors.roomId}</p>}
             </div>
 
             <div>
@@ -191,10 +196,17 @@ const RoomApplication = () => {
                 type="number"
                 name="preferredFloor"
                 value={formData.preferredFloor}
-                onChange={(e) => setFormData({ ...formData, preferredFloor: e.target.value })}
+                onChange={(e) => {
+                  setFormData({ ...formData, preferredFloor: e.target.value });
+                  if (errors.preferredFloor) {
+                    setErrors((prev) => ({ ...prev, preferredFloor: undefined }));
+                  }
+                }}
                 min="1"
+                aria-invalid={Boolean(errors.preferredFloor)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               />
+              {errors.preferredFloor && <p className="mt-1 text-sm text-red-600">{errors.preferredFloor}</p>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -204,9 +216,16 @@ const RoomApplication = () => {
                   type="datetime-local"
                   name="plannedCheckInAt"
                   value={formData.plannedCheckInAt}
-                  onChange={(e) => setFormData({ ...formData, plannedCheckInAt: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, plannedCheckInAt: e.target.value });
+                    if (errors.plannedCheckInAt) {
+                      setErrors((prev) => ({ ...prev, plannedCheckInAt: undefined }));
+                    }
+                  }}
+                  aria-invalid={Boolean(errors.plannedCheckInAt)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                 />
+                {errors.plannedCheckInAt && <p className="mt-1 text-sm text-red-600">{errors.plannedCheckInAt}</p>}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Check-out Date & Time</label>
@@ -214,9 +233,16 @@ const RoomApplication = () => {
                   type="datetime-local"
                   name="plannedCheckOutAt"
                   value={formData.plannedCheckOutAt}
-                  onChange={(e) => setFormData({ ...formData, plannedCheckOutAt: e.target.value })}
+                  onChange={(e) => {
+                    setFormData({ ...formData, plannedCheckOutAt: e.target.value });
+                    if (errors.plannedCheckOutAt) {
+                      setErrors((prev) => ({ ...prev, plannedCheckOutAt: undefined }));
+                    }
+                  }}
+                  aria-invalid={Boolean(errors.plannedCheckOutAt)}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                 />
+                {errors.plannedCheckOutAt && <p className="mt-1 text-sm text-red-600">{errors.plannedCheckOutAt}</p>}
               </div>
             </div>
 
@@ -231,25 +257,42 @@ const RoomApplication = () => {
         </div>
       )}
 
-      {/* Available Rooms */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h2 className="text-xl font-semibold mb-4">Available Rooms</h2>
-        {rooms.length === 0 ? (
-          <p className="text-gray-600">No rooms available at the moment.</p>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {rooms.map((room) => (
-              <div key={room._id} className="border border-gray-200 rounded-lg p-4">
-                <h3 className="font-semibold text-lg">{room.roomNumber}</h3>
-                <p className="text-sm text-gray-600">Type: {room.roomType}</p>
-                <p className="text-sm text-gray-600">Floor: {room.floor}</p>
-                <p className="text-sm text-gray-600">Capacity: {room.currentOccupancy}/{room.capacity}</p>
-                <p className="text-sm font-semibold text-indigo-600">₹{room.rent}/day</p>
+      {/* Booking History (kept at bottom) */}
+      {applications.length > 0 && (
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <h2 className="text-xl font-semibold mb-4">Booking History</h2>
+          <div className="space-y-4">
+            {applications.map((app) => (
+              <div key={app._id} className="border border-gray-200 rounded-lg p-4">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="font-semibold">Room: {app.roomId?.roomNumber}</p>
+                    <p className="text-sm text-gray-600">Type: {app.roomType}</p>
+                    <p className="text-sm text-gray-600">Applied: {new Date(app.appliedDate).toLocaleDateString()}</p>
+                    {app.plannedCheckInAt && app.plannedCheckOutAt && (
+                      <p className="text-sm text-gray-600">
+                        Planned: {new Date(app.plannedCheckInAt).toLocaleString()} - {new Date(app.plannedCheckOutAt).toLocaleString()}
+                      </p>
+                    )}
+                    {app.actualCheckOutAt && (
+                      <p className="text-sm text-gray-600">
+                        Checked out: {formatDateTime(app.actualCheckOutAt)}
+                      </p>
+                    )}
+                    {app.earlyCheckoutReason && (
+                      <p className="text-sm text-gray-600 mt-2">Checkout reason: {app.earlyCheckoutReason}</p>
+                    )}
+                    {app.remarks && <p className="text-sm text-gray-600 mt-2">Remarks: {app.remarks}</p>}
+                  </div>
+                  <span className={`px-3 py-1 rounded-full text-sm font-semibold ${getStatusBadge(displayStatus(app))}`}>
+                    {displayStatus(app)}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };

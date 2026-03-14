@@ -2,27 +2,43 @@ const Complaint = require('../models/Complaint');
 const ActivityLog = require('../models/ActivityLog');
 const Staff = require('../models/Staff');
 const User = require('../models/User');
-const Application = require('../models/Application');
 
-const archiveComplaintsForUser = async (userId, archivedAt) => {
-  await Complaint.updateMany(
-    { userId, isArchived: false },
-    { $set: { isArchived: true, archivedAt: archivedAt || new Date() } }
-  );
-};
+const findLeastBusyStaff = async (department) => {
+  const staffUsers = await User.find({
+    role: 'staff',
+    staffDepartment: department,
+    isActive: true
+  }).select('_id');
 
-const getCheckedOutUserIds = async () => {
-  const [checkedOutUsers, appCheckedOutUsers] = await Promise.all([
-    User.find({ checkOutAt: { $ne: null } }).select('_id'),
-    Application.distinct('userId', { actualCheckOutAt: { $ne: null } })
+  if (!staffUsers.length) return null;
+
+  const staffIds = staffUsers.map((s) => s._id);
+
+  const workload = await Complaint.aggregate([
+    {
+      $match: {
+        assignedTo: { $in: staffIds },
+        status: { $in: ['pending', 'assigned', 'in-progress'] },
+        isArchived: false
+      }
+    },
+    { $group: { _id: '$assignedTo', count: { $sum: 1 } } }
   ]);
 
-  return Array.from(
-    new Set([
-      ...checkedOutUsers.map((user) => user._id.toString()),
-      ...appCheckedOutUsers.map((id) => id.toString())
-    ])
-  );
+  const counts = new Map(workload.map((w) => [w._id.toString(), w.count]));
+
+  let selected = staffUsers[0];
+  let min = counts.get(selected._id.toString()) ?? 0;
+
+  for (const staff of staffUsers) {
+    const count = counts.get(staff._id.toString()) ?? 0;
+    if (count < min) {
+      min = count;
+      selected = staff;
+    }
+  }
+
+  return selected;
 };
 
 // Create complaint
@@ -65,22 +81,49 @@ exports.createComplaint = async (req, res) => {
   }
 };
 
+// Create emergency alert (resident quick action)
+exports.createEmergencyAlert = async (req, res) => {
+  try {
+    const { description } = req.body || {};
+    const user = await User.findById(req.user.userId).populate('roomId', 'roomNumber');
+
+    const staffMatch = await findLeastBusyStaff('security');
+
+    const message = description?.trim();
+    const fallbackDescription = `Emergency reported${user?.roomId ? ` in room ${user.roomId.roomNumber}` : ''}`;
+
+    const complaint = await Complaint.create({
+      userId: req.user.userId,
+      category: 'security',
+      title: 'Emergency Alert',
+      description: message || fallbackDescription,
+      priority: 'urgent',
+      assignedTo: staffMatch?._id,
+      isEmergency: true
+    });
+
+    if (staffMatch) {
+      complaint.status = 'assigned';
+      await complaint.save();
+    }
+
+    await ActivityLog.create({
+      userId: req.user.userId,
+      action: 'create',
+      entityType: 'emergency',
+      entityId: complaint._id,
+      description: `Emergency alert raised${user?.roomId ? ` from room ${user.roomId.roomNumber}` : ''}`
+    });
+
+    res.status(201).json(complaint);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 // Get user's complaints
 exports.getMyComplaints = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select('checkOutAt');
-    if (user?.checkOutAt) {
-      await archiveComplaintsForUser(user._id, user.checkOutAt);
-    } else {
-      const appCheckout = await Application.findOne({
-        userId: req.user.userId,
-        actualCheckOutAt: { $ne: null }
-      }).select('actualCheckOutAt');
-      if (appCheckout?.actualCheckOutAt) {
-        await archiveComplaintsForUser(req.user.userId, appCheckout.actualCheckOutAt);
-      }
-    }
-
     // Default to including history unless explicitly disabled.
     const includeHistory = req.query.includeHistory !== 'false';
     const filter = { userId: req.user.userId };
@@ -102,15 +145,6 @@ exports.getAllComplaints = async (req, res) => {
   try {
     // Default to including history unless explicitly disabled.
     const includeHistory = req.query.includeHistory !== 'false';
-    if (includeHistory) {
-      const checkedOutUserIds = await getCheckedOutUserIds();
-      if (checkedOutUserIds.length) {
-        await Complaint.updateMany(
-          { userId: { $in: checkedOutUserIds }, isArchived: false },
-          { $set: { isArchived: true, archivedAt: new Date() } }
-        );
-      }
-    }
 
     const { status, category, priority } = req.query;
     const filter = {};
@@ -138,15 +172,6 @@ exports.getAssignedComplaints = async (req, res) => {
   try {
     // Default to including history unless explicitly disabled.
     const includeHistory = req.query.includeHistory !== 'false';
-    if (includeHistory) {
-      const checkedOutUserIds = await getCheckedOutUserIds();
-      if (checkedOutUserIds.length) {
-        await Complaint.updateMany(
-          { userId: { $in: checkedOutUserIds }, isArchived: false },
-          { $set: { isArchived: true, archivedAt: new Date() } }
-        );
-      }
-    }
 
     const filter = { assignedTo: req.user.userId };
     if (!includeHistory) {
@@ -215,6 +240,11 @@ exports.updateComplaintStatus = async (req, res) => {
     if (status === 'resolved' || status === 'closed') {
       complaint.resolvedDate = new Date();
       complaint.resolutionNotes = resolutionNotes;
+      complaint.isArchived = true;
+      complaint.archivedAt = complaint.archivedAt || new Date();
+    } else {
+      complaint.isArchived = false;
+      complaint.archivedAt = null;
     }
     await complaint.save();
 

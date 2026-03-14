@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { validateHousekeeping } from '../../utils/validationSchemas';
 
 const Housekeeping = () => {
   const [requests, setRequests] = useState([]);
@@ -11,6 +12,7 @@ const Housekeeping = () => {
   });
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     fetchRequests();
@@ -26,18 +28,31 @@ const Housekeeping = () => {
   };
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const { errors: validationErrors, value } = validateHousekeeping(formData);
+
+    if (Object.keys(validationErrors).length) {
+      setErrors(validationErrors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      await api.post('/housekeeping', formData);
+      await api.post('/housekeeping', value);
       toast.success('Housekeeping request submitted successfully!');
       setFormData({ serviceType: '', preferredDate: '', preferredTime: '' });
       setShowForm(false);
+      setErrors({});
       fetchRequests();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to submit request');
@@ -62,7 +77,10 @@ const Housekeeping = () => {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Housekeeping</h1>
         <button
-          onClick={() => setShowForm(!showForm)}
+          onClick={() => {
+            setShowForm(!showForm);
+            setErrors({});
+          }}
           className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
         >
           {showForm ? 'Cancel' : 'Request Service'}
@@ -79,7 +97,7 @@ const Housekeeping = () => {
                 name="serviceType"
                 value={formData.serviceType}
                 onChange={handleChange}
-                required
+                aria-invalid={Boolean(errors.serviceType)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Select service type</option>
@@ -88,6 +106,7 @@ const Housekeeping = () => {
                 <option value="bedding">Bedding</option>
                 <option value="other">Other</option>
               </select>
+              {errors.serviceType && <p className="mt-1 text-sm text-red-600">{errors.serviceType}</p>}
             </div>
 
             <div>
@@ -97,10 +116,11 @@ const Housekeeping = () => {
                 name="preferredDate"
                 value={formData.preferredDate}
                 onChange={handleChange}
-                required
                 min={new Date().toISOString().split('T')[0]}
+                aria-invalid={Boolean(errors.preferredDate)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               />
+              {errors.preferredDate && <p className="mt-1 text-sm text-red-600">{errors.preferredDate}</p>}
             </div>
 
             <div>
@@ -109,7 +129,7 @@ const Housekeeping = () => {
                 name="preferredTime"
                 value={formData.preferredTime}
                 onChange={handleChange}
-                required
+                aria-invalid={Boolean(errors.preferredTime)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Select time</option>
@@ -123,6 +143,7 @@ const Housekeeping = () => {
                 <option value="04:00 PM">04:00 PM</option>
                 <option value="05:00 PM">05:00 PM</option>
               </select>
+              {errors.preferredTime && <p className="mt-1 text-sm text-red-600">{errors.preferredTime}</p>}
             </div>
 
             <button

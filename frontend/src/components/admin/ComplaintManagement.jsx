@@ -109,13 +109,19 @@ const ComplaintManagement = () => {
       <div className="bg-white p-4 rounded-lg shadow-md mb-6">
         <div className="flex flex-wrap gap-2 mb-4">
           <button
-            onClick={() => setView('active')}
+            onClick={() => {
+              setView('active');
+              setFilter({ status: 'all', category: 'all', priority: 'all' });
+            }}
             className={`px-4 py-2 rounded-lg font-semibold ${view === 'active' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}
           >
             Active
           </button>
           <button
-            onClick={() => setView('history')}
+            onClick={() => {
+              setView('history');
+              setFilter({ status: 'all', category: 'all', priority: 'all' });
+            }}
             className={`px-4 py-2 rounded-lg font-semibold ${view === 'history' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}
           >
             History

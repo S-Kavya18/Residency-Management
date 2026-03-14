@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../../services/api';
 import toast from 'react-hot-toast';
+import { validateRoom } from '../../utils/validationSchemas';
 
 const RoomManagement = () => {
   const [rooms, setRooms] = useState([]);
@@ -18,6 +19,7 @@ const RoomManagement = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingRoom, setEditingRoom] = useState(null);
   const [filters, setFilters] = useState({ acType: 'all', floor: 'all', status: 'all' });
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     fetchRooms();
@@ -46,18 +48,29 @@ const RoomManagement = () => {
     } else {
       setFormData({ ...formData, [name]: name === 'floor' || name === 'capacity' || name === 'rent' ? parseInt(value) || 0 : value });
     }
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: undefined }));
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const { errors: validationErrors, value } = validateRoom(formData);
+
+    if (Object.keys(validationErrors).length) {
+      setErrors(validationErrors);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
+
     setLoading(true);
 
     try {
       if (editingRoom) {
-        await api.put(`/rooms/${editingRoom._id}`, formData);
+        await api.put(`/rooms/${editingRoom._id}`, value);
         toast.success('Room updated successfully!');
       } else {
-        await api.post('/rooms', formData);
+        await api.post('/rooms', value);
         toast.success('Room created successfully!');
       }
       setFormData({
@@ -70,6 +83,7 @@ const RoomManagement = () => {
         description: '',
         status: 'available'
       });
+      setErrors({});
       setEditingRoom(null);
       setShowForm(false);
       fetchRooms();
@@ -92,6 +106,7 @@ const RoomManagement = () => {
       description: room.description || '',
       status: room.status
     });
+    setErrors({});
     setShowForm(true);
   };
 
@@ -160,6 +175,7 @@ const RoomManagement = () => {
               description: '',
               status: 'available'
             });
+            setErrors({});
           }}
           className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
         >
@@ -225,9 +241,10 @@ const RoomManagement = () => {
                 name="roomNumber"
                 value={formData.roomNumber}
                 onChange={handleChange}
-                required
+                aria-invalid={Boolean(errors.roomNumber)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               />
+              {errors.roomNumber && <p className="mt-1 text-sm text-red-600">{errors.roomNumber}</p>}
             </div>
 
             <div>
@@ -236,7 +253,7 @@ const RoomManagement = () => {
                 name="roomType"
                 value={formData.roomType}
                 onChange={handleChange}
-                required
+                aria-invalid={Boolean(errors.roomType)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="single">Single</option>
@@ -244,6 +261,7 @@ const RoomManagement = () => {
                 <option value="triple">Triple</option>
                 <option value="quad">Quad</option>
               </select>
+              {errors.roomType && <p className="mt-1 text-sm text-red-600">{errors.roomType}</p>}
             </div>
 
             <div>
@@ -253,10 +271,11 @@ const RoomManagement = () => {
                 name="floor"
                 value={formData.floor}
                 onChange={handleChange}
-                required
                 min="1"
+                aria-invalid={Boolean(errors.floor)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               />
+              {errors.floor && <p className="mt-1 text-sm text-red-600">{errors.floor}</p>}
             </div>
 
             <div>
@@ -266,10 +285,11 @@ const RoomManagement = () => {
                 name="capacity"
                 value={formData.capacity}
                 onChange={handleChange}
-                required
                 min="1"
+                aria-invalid={Boolean(errors.capacity)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               />
+              {errors.capacity && <p className="mt-1 text-sm text-red-600">{errors.capacity}</p>}
             </div>
 
             <div>
@@ -279,10 +299,11 @@ const RoomManagement = () => {
                 name="rent"
                 value={formData.rent}
                 onChange={handleChange}
-                required
                 min="0"
+                aria-invalid={Boolean(errors.rent)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               />
+              {errors.rent && <p className="mt-1 text-sm text-red-600">{errors.rent}</p>}
             </div>
 
             <div>
@@ -291,13 +312,14 @@ const RoomManagement = () => {
                 name="status"
                 value={formData.status}
                 onChange={handleChange}
-                required
+                aria-invalid={Boolean(errors.status)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               >
                 <option value="available">Available</option>
                 <option value="occupied">Occupied</option>
                 <option value="maintenance">Maintenance</option>
               </select>
+              {errors.status && <p className="mt-1 text-sm text-red-600">{errors.status}</p>}
             </div>
 
             <div className="md:col-span-2">
@@ -310,6 +332,7 @@ const RoomManagement = () => {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                 placeholder="WiFi, AC, TV, etc."
               />
+              {errors.amenities && <p className="mt-1 text-sm text-red-600">{errors.amenities}</p>}
             </div>
 
             <div className="md:col-span-2">
@@ -319,8 +342,10 @@ const RoomManagement = () => {
                 value={formData.description}
                 onChange={handleChange}
                 rows="3"
+                aria-invalid={Boolean(errors.description)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg"
               />
+              {errors.description && <p className="mt-1 text-sm text-red-600">{errors.description}</p>}
             </div>
 
             <div className="md:col-span-2">

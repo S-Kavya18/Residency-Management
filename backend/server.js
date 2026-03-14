@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
+const { scheduleAutoCheckout } = require('./utils/autoCheckout');
 
 dotenv.config();
 
@@ -35,7 +36,10 @@ mongoose
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .then(() => console.log('MongoDB Connected'))
+  .then(() => {
+    console.log('MongoDB Connected');
+    scheduleAutoCheckout();
+  })
   .catch((err) => console.error('MongoDB Connection Error:', err));
 
 const PORT = process.env.PORT || 5000;

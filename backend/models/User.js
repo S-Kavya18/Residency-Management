@@ -37,6 +37,11 @@ const userSchema = new mongoose.Schema({
     type: String,
     trim: true
   },
+  googleId: {
+    type: String,
+    default: null,
+    unique: false
+  },
   roomId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Room',

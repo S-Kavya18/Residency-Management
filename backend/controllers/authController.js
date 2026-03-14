@@ -3,11 +3,20 @@ const Staff = require('../models/Staff');
 const ActivityLog = require('../models/ActivityLog');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const { OAuth2Client } = require('google-auth-library');
 
 const generateToken = (userId, role) => {
   return jwt.sign({ userId, role }, process.env.JWT_SECRET || 'your_secret_key', {
     expiresIn: '30d'
   });
+};
+
+const getGoogleClient = () => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    throw new Error('GOOGLE_CLIENT_ID is not configured');
+  }
+  return new OAuth2Client(clientId);
 };
 
 // Register
@@ -120,6 +129,89 @@ exports.login = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
+  }
+};
+
+// Google Sign-In
+exports.googleLogin = async (req, res) => {
+  try {
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ message: 'Missing Google credential' });
+    }
+
+    const client = getGoogleClient();
+    const ticket = await client.verifyIdToken({ idToken: credential, audience: process.env.GOOGLE_CLIENT_ID });
+    const payload = ticket.getPayload();
+
+    const email = payload?.email;
+    const name = payload?.name || email;
+    const googleId = payload?.sub;
+
+    if (!email || !googleId) {
+      return res.status(400).json({ message: 'Invalid Google token payload' });
+    }
+
+    // Do not allow staff/admin Google login unless user already exists with that role
+    const staffAccount = await Staff.findOne({ email });
+    if (staffAccount) {
+      return res.status(403).json({ message: 'Please login with password for staff accounts' });
+    }
+
+    let user = await User.findOne({ email });
+    if (!user) {
+      const tempPassword = `GOOGLE_${googleId}_${Date.now()}`;
+      user = await User.create({
+        name,
+        email,
+        password: tempPassword,
+        role: 'resident',
+        googleId,
+        isActive: true
+      });
+
+      await ActivityLog.create({
+        userId: user._id,
+        action: 'register',
+        entityType: 'user',
+        entityId: user._id,
+        description: 'User registered via Google'
+      });
+    } else {
+      if (!user.isActive) {
+        return res.status(403).json({ message: 'Account is deactivated' });
+      }
+      if (!user.googleId) {
+        user.googleId = googleId;
+        await user.save();
+      }
+    }
+
+    const token = generateToken(user._id, user.role);
+
+    await ActivityLog.create({
+      userId: user._id,
+      action: 'login',
+      entityType: 'user',
+      entityId: user._id,
+      description: 'User logged in via Google',
+      ipAddress: req.ip
+    });
+
+    res.json({
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        roomId: user.roomId,
+        staffDepartment: user.staffDepartment
+      }
+    });
+  } catch (error) {
+    console.error('Google login failed:', error.message);
+    res.status(500).json({ message: 'Google login failed' });
   }
 };
 

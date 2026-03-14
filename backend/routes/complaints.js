@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   createComplaint,
+  createEmergencyAlert,
   getMyComplaints,
   getAllComplaints,
   getAssignedComplaints,
@@ -12,6 +13,7 @@ const { auth, authorize } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
 router.post('/', auth, authorize('resident'), upload.single('image'), createComplaint);
+router.post('/emergency', auth, authorize('resident'), createEmergencyAlert);
 router.get('/my', auth, authorize('resident'), getMyComplaints);
 router.get('/all', auth, authorize('admin'), getAllComplaints);
 router.get('/assigned', auth, authorize('staff'), getAssignedComplaints);

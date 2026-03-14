@@ -2,7 +2,6 @@ const Room = require('../models/Room');
 const Application = require('../models/Application');
 const ActivityLog = require('../models/ActivityLog');
 const User = require('../models/User');
-const Complaint = require('../models/Complaint');
 
 const syncRoomAvailability = (room) => {
   if (room.status === 'maintenance') {
@@ -200,11 +199,6 @@ exports.checkoutRoom = async (req, res) => {
       }
       await latestApplication.save();
     }
-
-    await Complaint.updateMany(
-      { userId: user._id, isArchived: false },
-      { $set: { isArchived: true, archivedAt: now } }
-    );
 
     await ActivityLog.create({
       userId: req.user.userId,
