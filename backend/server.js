@@ -24,6 +24,10 @@ app.use('/api/food', require('./routes/food'));
 app.use('/api/housekeeping', require('./routes/housekeeping'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/staff', require('./routes/staff'));
+app.get('/', (req, res) => {
+  res.send('Smart Residency Backend Running');
+});
+
 
 // Health check
 app.get('/api/health', (req, res) => {
