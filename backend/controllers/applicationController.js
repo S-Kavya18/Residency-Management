@@ -9,23 +9,16 @@ exports.createApplication = async (req, res) => {
     const { roomId, preferredFloor, roomType, plannedCheckInAt, plannedCheckOutAt } = req.body;
     const userId = req.user.userId;
 
-    // Check if user already has an active application
-    const existingApplication = await Application.findOne({
-      userId,
-      status: 'pending'
-    });
-
+    const existingApplication = await Application.findOne({ userId, status: 'pending' });
     if (existingApplication) {
       return res.status(400).json({ message: 'You already have a pending application' });
     }
 
-    // Check if user already has a room
     const user = await User.findById(userId);
     if (user.roomId) {
       return res.status(400).json({ message: 'You already have a room allocated' });
     }
 
-    // Check if room is available
     const room = await Room.findById(roomId);
     if (!room || !room.isRoomAvailable()) {
       return res.status(400).json({ message: 'Room is not available' });
@@ -47,6 +40,9 @@ exports.createApplication = async (req, res) => {
       roomId,
       preferredFloor,
       roomType,
+      paymentAmount: room.rent,
+      paymentStatus: 'paid',
+      paymentReference: 'payment-disabled',
       plannedCheckInAt: plannedCheckInAt || null,
       plannedCheckOutAt: plannedCheckOutAt || null
     });
@@ -118,7 +114,6 @@ exports.approveApplication = async (req, res) => {
       return res.status(400).json({ message: 'Room is no longer available' });
     }
 
-    // Update application
     application.status = 'approved';
     application.reviewedDate = new Date();
     application.reviewedBy = req.user.userId;
@@ -126,13 +121,11 @@ exports.approveApplication = async (req, res) => {
     application.actualCheckInAt = new Date();
     await application.save();
 
-    // Update room occupancy and lock room once booked
     room.currentOccupancy = Math.min(room.currentOccupancy + 1, room.capacity);
     room.isAvailable = false;
     room.status = 'occupied';
     await room.save();
 
-    // Allocate room to user
     const user = application.userId;
     user.roomId = room._id;
     user.checkInAt = new Date();

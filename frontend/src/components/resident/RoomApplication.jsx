@@ -269,6 +269,7 @@ const RoomApplication = () => {
                     <p className="font-semibold">Room: {app.roomId?.roomNumber}</p>
                     <p className="text-sm text-gray-600">Type: {app.roomType}</p>
                     <p className="text-sm text-gray-600">Applied: {new Date(app.appliedDate).toLocaleDateString()}</p>
+                    <p className="text-sm text-gray-600">Payment: Not required</p>
                     {app.plannedCheckInAt && app.plannedCheckOutAt && (
                       <p className="text-sm text-gray-600">
                         Planned: {new Date(app.plannedCheckInAt).toLocaleString()} - {new Date(app.plannedCheckOutAt).toLocaleString()}
@@ -288,6 +289,9 @@ const RoomApplication = () => {
                     {displayStatus(app)}
                   </span>
                 </div>
+                {app.paymentReference && (
+                  <p className="text-sm text-gray-600 mt-2">Payment ref: {app.paymentReference}</p>
+                )}
               </div>
             ))}
           </div>

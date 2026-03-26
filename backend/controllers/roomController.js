@@ -68,6 +68,10 @@ exports.createRoom = async (req, res) => {
 
     res.status(201).json(room);
   } catch (error) {
+    // Surface duplicate room number errors clearly to the client
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Room number already exists. Please choose a different number.' });
+    }
     res.status(500).json({ message: error.message });
   }
 };
@@ -95,6 +99,9 @@ exports.updateRoom = async (req, res) => {
 
     res.json(room);
   } catch (error) {
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Room number already exists. Please choose a different number.' });
+    }
     res.status(500).json({ message: error.message });
   }
 };

@@ -125,6 +125,13 @@ const ApplicationManagement = () => {
                       {new Date(app.appliedDate).toLocaleDateString()}
                     </p>
                   </div>
+                  <div>
+                    <p className="text-sm text-gray-600">Payment</p>
+                    <p className="font-semibold">Not required</p>
+                    {app.paymentReference && (
+                      <p className="text-xs text-gray-500">Ref: {app.paymentReference}</p>
+                    )}
+                  </div>
                   {app.plannedCheckInAt && app.plannedCheckOutAt && (
                     <div>
                       <p className="text-sm text-gray-600">Planned Stay</p>

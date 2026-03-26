@@ -98,6 +98,9 @@ const Complaints = () => {
     return badges[priority] || 'bg-gray-100 text-gray-800';
   };
 
+  const activeComplaints = complaints.filter((c) => !c.isArchived && !['resolved', 'closed'].includes(c.status));
+  const historyComplaints = complaints.filter((c) => c.isArchived || ['resolved', 'closed'].includes(c.status));
+
   return (
     <div>
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
@@ -222,21 +225,13 @@ const Complaints = () => {
         <h2 className="text-xl font-semibold mb-4">
           {view === 'history' ? 'Complaint History' : 'My Complaints'}
         </h2>
-        {complaints.filter((c) => {
-          const isHistory = c.isArchived || ['resolved', 'closed'].includes(c.status);
-          return view === 'history' ? isHistory : !isHistory;
-        }).length === 0 ? (
+        {(view === 'history' ? historyComplaints : activeComplaints).length === 0 ? (
           <p className="text-gray-600">
             {view === 'history' ? 'No complaint history available.' : 'No complaints submitted yet.'}
           </p>
         ) : (
           <div className="space-y-4">
-            {complaints
-              .filter((c) => {
-                const isHistory = c.isArchived || ['resolved', 'closed'].includes(c.status);
-                return view === 'history' ? isHistory : !isHistory;
-              })
-              .map((complaint) => (
+            {(view === 'history' ? historyComplaints : activeComplaints).map((complaint) => (
               <div key={complaint._id} className="border border-gray-200 rounded-lg p-4">
                 <div className="flex justify-between items-start mb-2">
                   <div>

@@ -2,7 +2,13 @@
 node_modules/
 package-lock.json
 yarn.lock
-
+node_modules/
+.env
+build/
+dist/
+coverage/
+.DS_Store
+npm-debug.log
 # Environment variables
 .env
 .env.local

@@ -20,6 +20,32 @@ const applicationSchema = new mongoose.Schema({
     enum: ['single', 'double', 'triple', 'quad'],
     required: true
   },
+  paymentStatus: {
+    type: String,
+    enum: ['pending', 'paid', 'failed'],
+    default: 'paid'
+  },
+  paymentAmount: {
+    type: Number,
+    default: 0,
+    min: 0
+  },
+  paymentReference: {
+    type: String,
+    trim: true
+  },
+  paymentOrderId: {
+    type: String,
+    trim: true
+  },
+  paymentSignature: {
+    type: String,
+    trim: true
+  },
+  paymentDate: {
+    type: Date,
+    default: null
+  },
   plannedCheckInAt: {
     type: Date,
     default: null

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import toast from 'react-hot-toast';
@@ -10,17 +10,18 @@ const Login = () => {
   const [mounted, setMounted] = useState(false);
   const [errors, setErrors] = useState({});
   const [googleReady, setGoogleReady] = useState(false);
-  const [googleInit, setGoogleInit] = useState(false);
+  const [googleButtonRendered, setGoogleButtonRendered] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleInitErrorShown, setGoogleInitErrorShown] = useState(false);
+  const googleButtonRef = useRef(null);
+  const googleScriptRetryCount = useRef(0);
   const { login, googleLogin } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    setMounted(true);
+  const loadGoogleScript = () => {
     const existingScript = document.getElementById('google-identity');
     if (existingScript) {
-      setGoogleReady(true);
-      return;
+      existingScript.remove();
     }
 
     const script = document.createElement('script');
@@ -31,7 +32,70 @@ const Login = () => {
     script.onload = () => setGoogleReady(true);
     script.onerror = () => setGoogleReady(false);
     document.body.appendChild(script);
+  };
+
+  useEffect(() => {
+    setMounted(true);
+    loadGoogleScript();
   }, []);
+
+  useEffect(() => {
+    if (!googleReady) return;
+
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      toast.error('Google Sign-In is not configured');
+      return;
+    }
+
+    if (!window.google?.accounts?.id) {
+      if (googleScriptRetryCount.current < 2) {
+        googleScriptRetryCount.current += 1;
+        setGoogleReady(false);
+        loadGoogleScript();
+        return;
+      }
+      if (!googleInitErrorShown) {
+        toast.error('Google Sign-In failed to load. Please refresh and try again.');
+        setGoogleInitErrorShown(true);
+      }
+      return;
+    }
+
+    setGoogleInitErrorShown(false);
+
+    try {
+      window.google.accounts.id.initialize({
+        client_id: clientId,
+        callback: ({ credential }) => {
+          if (credential) {
+            handleGoogleCredential(credential);
+          } else {
+            toast.error('Google sign-in was cancelled');
+          }
+        },
+        ux_mode: 'popup',
+        use_fedcm_for_prompt: true,
+        cancel_on_tap_outside: false
+      });
+
+      if (googleButtonRef.current && !googleButtonRendered) {
+        window.google.accounts.id.renderButton(googleButtonRef.current, {
+          type: 'standard',
+          theme: 'outline',
+          text: 'continue_with',
+          shape: 'pill',
+          size: 'large',
+          width: 360
+        });
+        setGoogleButtonRendered(true);
+      }
+    } catch (err) {
+      console.error('Failed to initialize Google Sign-In', err);
+      toast.error('Google Sign-In failed to initialize. Please refresh and try again.');
+      setGoogleReady(false);
+    }
+  }, [googleReady, googleButtonRendered, googleInitErrorShown]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -92,44 +156,6 @@ const Login = () => {
     setGoogleLoading(false);
   };
 
-  const triggerGoogleLogin = () => {
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId) {
-      toast.error('Google Sign-In is not configured');
-      return;
-    }
-
-    if (!googleReady || !window.google?.accounts?.id) {
-      toast.error('Google Sign-In is not ready. Please try again.');
-      return;
-    }
-
-    if (!googleInit) {
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: ({ credential }) => {
-          if (credential) {
-            handleGoogleCredential(credential);
-          } else {
-            toast.error('Google sign-in was cancelled');
-          }
-        },
-        ux_mode: 'popup',
-        use_fedcm_for_prompt: false
-      });
-      setGoogleInit(true);
-    }
-
-    window.google.accounts.id.prompt((notification) => {
-      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-        const notDisplayed = notification.getNotDisplayedReason?.();
-        const skipped = notification.getSkippedReason?.();
-        console.warn('Google prompt blocked/skipped', { notDisplayed, skipped });
-        toast.error('Google sign-in was blocked or cancelled. Check popup blockers or try again.');
-      }
-    });
-  };
-
   return (
     <div className="min-h-screen landing-bg flex items-center justify-center px-4">
       <div
@@ -177,21 +203,21 @@ const Login = () => {
           </button>
         </form>
         <div className="mt-4">
-          <button
-            type="button"
-            onClick={triggerGoogleLogin}
-            disabled={googleLoading}
-            className="w-full flex items-center justify-center gap-2 border border-slate-300 py-2 rounded-lg font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" className="h-5 w-5">
-              <path fill="#EA4335" d="M24 9.5c3.17 0 5.37 1.37 6.6 2.5l4.82-4.82C32.64 4.46 28.68 3 24 3 14.9 3 7.16 8.68 4.1 16.26l5.95 4.62C11.7 14.32 17.3 9.5 24 9.5z"/>
-              <path fill="#4285F4" d="M46.5 24.5c0-1.64-.15-3.2-.42-4.71H24v9h12.65c-.55 2.96-2.2 5.47-4.71 7.16l7.32 5.68C43.95 38.44 46.5 31.95 46.5 24.5z"/>
-              <path fill="#FBBC05" d="M10.05 28.88a14.5 14.5 0 0 1-.75-4.38c0-1.52.27-2.99.74-4.38l-5.95-4.62A23.44 23.44 0 0 0 1.5 24.5c0 3.8.9 7.38 2.5 10.5l6.05-6.12z"/>
-              <path fill="#34A853" d="M24 46.5c6.48 0 11.92-2.13 15.9-5.82l-7.32-5.68c-2.01 1.35-4.58 2.16-8.58 2.16-6.7 0-12.3-4.82-14.35-11.29l-6.05 6.12C7.16 40.32 14.9 46.5 24 46.5z"/>
-              <path fill="none" d="M1.5 1.5h45v45h-45z"/>
-            </svg>
-            {googleLoading ? 'Connecting...' : 'Continue with Google'}
-          </button>
+          {googleReady ? (
+            <div
+              ref={googleButtonRef}
+              className={`flex justify-center ${googleLoading ? 'opacity-60 pointer-events-none' : ''}`}
+              aria-busy={googleLoading}
+            />
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="w-full flex items-center justify-center gap-2 border border-slate-300 py-2 rounded-lg font-semibold text-slate-500 bg-slate-50 cursor-not-allowed"
+            >
+              Continue with Google (loading)
+            </button>
+          )}
         </div>
         <p className="mt-6 text-center text-sm text-slate-600">
           Don't have an account?{' '}

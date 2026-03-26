@@ -108,6 +108,9 @@ const complaintSchema = yup.object({
   priority: yup.string().oneOf(['low', 'medium', 'high', 'urgent']).required('Priority is required'),
   image: yup
     .mixed()
+    .nullable()
+    .notRequired()
+    .transform((file) => (file === null ? undefined : file))
     .test('fileSize', 'Image must be under 5MB', (file) => !file || (file.size ?? 0) <= 5 * 1024 * 1024)
     .test('fileType', 'Only image files are allowed', (file) => !file || (file.type ? file.type.startsWith('image/') : true))
 });

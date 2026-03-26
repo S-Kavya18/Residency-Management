@@ -47,10 +47,8 @@ exports.createComplaint = async (req, res) => {
     const { category, title, description, priority } = req.body;
     const image = req.file ? `/uploads/${req.file.filename}` : null;
 
-    const staffMatch = await Staff.findOne({
-      staffDepartment: category,
-      isActive: true
-    }).sort({ createdAt: 1 });
+    // Automatically assign to least-busy active staff in the same department
+    const staffMatch = await findLeastBusyStaff(category);
 
     const complaint = await Complaint.create({
       userId: req.user.userId,
@@ -59,13 +57,9 @@ exports.createComplaint = async (req, res) => {
       description,
       priority,
       image,
-      assignedTo: staffMatch?._id
+      assignedTo: staffMatch?._id,
+      status: staffMatch ? 'assigned' : 'pending'
     });
-
-    if (staffMatch) {
-      complaint.status = 'assigned';
-      await complaint.save();
-    }
 
     await ActivityLog.create({
       userId: req.user.userId,

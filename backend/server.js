@@ -32,12 +32,9 @@ app.get('/api/health', (req, res) => {
 
 // MongoDB Connection
 mongoose
-  .connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/smart-residency', {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  })
+  .connect(process.env.MONGODB_URI)
   .then(() => {
-    console.log('MongoDB Connected');
+    console.log('MongoDB Atlas Connected');
     scheduleAutoCheckout();
   })
   .catch((err) => console.error('MongoDB Connection Error:', err));
